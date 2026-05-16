@@ -87,6 +87,12 @@ Hardware Turbo Sound (Dual AY/YM) emulator for ZX Spectrum based on the high-spe
   
 Далее прошить при помощи [AVRDUDESS](Programmer/AVRDUDESS-2.18-portable.zip) 
   
+Исходные материалы [тут](Sources/AY_Emu.rar)
+  
+Собирается в Atmel Studio 7.0  
+  
+---
+  
 ## 🤝 Авторы и благодарности
 
 *   **Александр Корочинский** — автор оригинального кода прошивок эмуляции AY-3-8910 и YM2149F.
