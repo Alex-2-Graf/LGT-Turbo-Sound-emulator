@@ -24,6 +24,7 @@ Hardware Turbo Sound (Dual AY/YM) emulator for ZX Spectrum based on the high-spe
 Проект поддерживает **4 варианта аппаратного исполнения** под любые задачи:  
   
 **DIP-28 (Без кварца):** Максимально компактный вариант на базе встроенного генератора 32 МГц. Идеален для экономии места.  
+  
 [Схема](Export/TurboSound_LGT_28p.pdf) [Монтаж](Export/TurboSound_LGT_28p.html) [Gerber](Gerber/TS_LGT_28p_Gerber.zip)  
   
 ![](Foto/TurboSound_LGT_28p_1.png)  
