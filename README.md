@@ -43,9 +43,9 @@ Hardware Turbo Sound (Dual AY/YM) emulator for ZX Spectrum based on the high-spe
   
 [Схема](Export/TurboSound_LGT_40p.pdf) [Монтаж](Export/TurboSound_LGT_40p.html) [Gerber](Gerber/TS_LGT_40p_Gerber.zip)  
   
-![](Foto/TurboSound_LGT_40p_1.png)  
+![](Foto/TurboSound_LGT_40p_1.jpg)  
   
-![](Foto/TurboSound_LGT_40p_2.png)  
+![](Foto/TurboSound_LGT_40p_2.jpg)  
   
 **DIP-40 (С кварцем):** Полноразмерный вариант с внешним тактованием для максимального качества эмуляции.  
   
