@@ -95,7 +95,7 @@ Hardware Turbo Sound (Dual AY/YM) emulator for ZX Spectrum based on the high-spe
   
 ## 🤝 Авторы и благодарности
 
-*   **[Александр Корочинский](https://t.me/@AlexKorochinskiy)** — автор оригинального кода прошивок эмуляции AY-3-8910 и YM2149F.
+*   **[Александр Корочинский](https://t.me/AlexKorochinskiy)** — автор оригинального кода прошивок эмуляции AY-3-8910 и YM2149F.
 *   **[Alex-2-Graf](https://github.com/Alex-2-Graf)** — схемотехника, разводка печатных плат в KiCad, адаптация и оформление проекта.
   
 ## 📜 Лицензия
