@@ -64,7 +64,7 @@ Hardware Turbo Sound (Dual AY/YM) emulator for ZX Spectrum based on the high-spe
 ### **AY-3-8910**  
   
 * [TS_Emu_INT_32MHz_AY](Firmware/TS_Emu_INT_32MHz_AY) Внутренний генератор 32 МГц, чип AY-3-8910
-* [TS_Emu_INT_37MHz_AY](Firmware/TS_Emu_INT_37MHz_AY) Внутренний генератор 37 МГц, чип AY-3-8910
+* [TS_Emu_INT_37MHz_AY](Firmware/TS_Emu_INT_37MHz_AY) Внутренний генератор 37 МГц, чип AY-3-8910 (рекомендуется для работы без генератора)
 * [TS_Emu_EXT_40MHz_AY](Firmware/TS_Emu_EXT_40MHz_AY) Внешний генератор 40 МГц, чип AY-3-8910
 * [TS_Emu_EXT_48MHz_AY](Firmware/TS_Emu_EXT_48MHz_AY) Внешний генератор 48 МГц, чип AY-3-8910
 * [TS_Emu_EXT_50MHz_AY](Firmware/TS_Emu_EXT_50MHz_AY) Внешний генератор 50 МГц, чип AY-3-8910
@@ -72,7 +72,7 @@ Hardware Turbo Sound (Dual AY/YM) emulator for ZX Spectrum based on the high-spe
 ### **YM2149F**
   
 * [TS_Emu_INT_32MHz_YM](Firmware/TS_Emu_INT_32MHz_YM) Внутренний генератор 32 МГц, чип YM2149F
-* [TS_Emu_INT_37MHz_YM](Firmware/TS_Emu_INT_37MHz_YM) Внутренний генератор 37 МГц, чип YM2149F
+* [TS_Emu_INT_37MHz_YM](Firmware/TS_Emu_INT_37MHz_YM) Внутренний генератор 37 МГц, чип YM2149F (рекомендуется для работы без генератора)
 * [TS_Emu_EXT_40MHz_YM](Firmware/TS_Emu_EXT_40MHz_YM) Внешний генератор 40 МГц, чип YM2149F
 * [TS_Emu_EXT_48MHz_YM](Firmware/TS_Emu_EXT_48MHz_YM) Внешний генератор 48 МГц, чип YM2149F
 * [TS_Emu_EXT_50MHz_YM](Firmware/TS_Emu_EXT_50MHz_YM) Внешний генератор 50 МГц, чип YM2149F
