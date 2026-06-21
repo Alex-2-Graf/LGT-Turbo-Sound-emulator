@@ -1,6 +1,8 @@
 # LGT-Turbo-Sound-emulator
 Hardware Turbo Sound (Dual AY/YM) emulator for ZX Spectrum based on the high-speed LGT8F328P microcontroller.
   
+> [English](README.en.md) | [Русский](README.md)  
+  
 # Эмулятор Turbo Sound на микроконтроллере LGT8F328P 🎹⚡
   
 Проект аппаратного эмулятора двух музыкальных сопроцессоров AY-3-8910 / YM2149F (стандарт **Turbo Sound**) для компьютеров **ZX Spectrum** и их клонов. 
