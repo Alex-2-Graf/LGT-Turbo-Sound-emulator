@@ -40,18 +40,18 @@ A full-sized drop-in replacement layout utilizing an external clock generator fo
 The project features specific binary builds corresponding to different clock generator modes, as well as separate firmware versions optimized for either **AY-3-8910** or **YM2149F** chips (taking their unique hardware volume envelope tables into account).
 
 ### **AY-3-8910 Targeted Firmware**
-*   `[TS_Emu_INT_32MHz_AY](Firmware/TS_Emu_INT_32MHz_AY)` — Internal 32 MHz oscillator, AY-3-8910 tables.
-*   `[TS_Emu_INT_37MHz_AY](Firmware/TS_Emu_INT_37MHz_AY)` — Internal 37 MHz oscillator, AY-3-8910 tables (*Recommended for crystal-less builds*).
-*   `[TS_Emu_EXT_40MHz_AY](Firmware/TS_Emu_EXT_40MHz_AY)` — External 40 MHz clock, AY-3-8910 tables.
-*   `[TS_Emu_EXT_48MHz_AY](Firmware/TS_Emu_EXT_48MHz_AY)` — External 48 MHz clock, AY-3-8910 tables.
-*   `[TS_Emu_EXT_50MHz_AY](Firmware/TS_Emu_EXT_50MHz_AY)` — External 50 MHz clock, AY-3-8910 tables.
+*   [TS_Emu_INT_32MHz_AY](Firmware/TS_Emu_INT_32MHz_AY) — Internal 32 MHz oscillator, AY-3-8910 tables.
+*   [TS_Emu_INT_37MHz_AY](Firmware/TS_Emu_INT_37MHz_AY) — Internal 37 MHz oscillator, AY-3-8910 tables (*Recommended for crystal-less builds*).
+*   [TS_Emu_EXT_40MHz_AY](Firmware/TS_Emu_EXT_40MHz_AY) — External 40 MHz clock, AY-3-8910 tables.
+*   [TS_Emu_EXT_48MHz_AY](Firmware/TS_Emu_EXT_48MHz_AY) — External 48 MHz clock, AY-3-8910 tables.
+*   [TS_Emu_EXT_50MHz_AY](Firmware/TS_Emu_EXT_50MHz_AY) — External 50 MHz clock, AY-3-8910 tables.
 
 ### **YM2149F Targeted Firmware**
-*   `[TS_Emu_INT_32MHz_YM](Firmware/TS_Emu_INT_32MHz_YM)` — Internal 32 MHz oscillator, YM2149F tables.
-*   `[TS_Emu_INT_37MHz_YM](Firmware/TS_Emu_INT_37MHz_YM)` — Internal 37 MHz oscillator, YM2149F tables (*Recommended for crystal-less builds*).
-*   `[TS_Emu_EXT_40MHz_YM](Firmware/TS_Emu_EXT_40MHz_YM)` — External 40 MHz clock, YM2149F tables.
-*   `[TS_Emu_EXT_48MHz_YM](Firmware/TS_Emu_EXT_48MHz_YM)` — External 48 MHz clock, YM2149F tables.
-*   `[TS_Emu_EXT_50MHz_YM](Firmware/TS_Emu_EXT_50MHz_YM)` — External 50 MHz clock, YM2149F tables.
+*   [TS_Emu_INT_32MHz_YM](Firmware/TS_Emu_INT_32MHz_YM) — Internal 32 MHz oscillator, YM2149F tables.
+*   [TS_Emu_INT_37MHz_YM](Firmware/TS_Emu_INT_37MHz_YM) — Internal 37 MHz oscillator, YM2149F tables (*Recommended for crystal-less builds*).
+*   [TS_Emu_EXT_40MHz_YM](Firmware/TS_Emu_EXT_40MHz_YM) — External 40 MHz clock, YM2149F tables.
+*   [TS_Emu_EXT_48MHz_YM](Firmware/TS_Emu_EXT_48MHz_YM) — External 48 MHz clock, YM2149F tables.
+*   [TS_Emu_EXT_50MHz_YM](Firmware/TS_Emu_EXT_50MHz_YM) — External 50 MHz clock, YM2149F tables.
 
 ---
 
