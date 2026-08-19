@@ -1,0 +1,1065 @@
+; AY-3-8912 IC emulator version 26.0 for LGT8F328P
+; Эмулятор микросхемы AY-3-8912 версии 26.0 для LGT8F328P
+;
+; Sources for Atmel AVRStudio 7
+; Исходный код для Atmel AVRStudio 7
+;
+; visit our site for more information
+; посетите наш сайт для получения дополнительной информации
+; These source codes are distributed under the GPL v3 license
+; Эти исходные коды распространяются под лицензией GPL v3
+; If you share these sources you should put the link to web site www.avray.ru
+; Если вы делитесь этими исходниками, вы должны указать ссылку на сайт www.avray.ru
+;
+; ORIGIN: http://www.avray.ru
+; ИСТОЧНИК: http://www.avray.ru
+
+; CONFIGURATION VALUES ===================================================
+; КОНФИГУРАЦИОННЫЕ ЗНАЧЕНИЯ ==============================================
+#define CHANNELS 2 		; choose 2 or 3 channel version
+                        ; выбрать версию с 2 или 3 каналами
+#define SPEAKER 0		; use SPEAKER port input on PD1 (0 - no, 1 - yes)
+                        ; использовать вход SPEAKER на PD1 (0 - нет, 1 - да)
+#define VOLUME_TABLE 0	; 0 - AY, 1 - YM, 2 - ALTERNATE volume table
+                        ; 0 - таблица громкости AY, 1 - YM, 2 - АЛЬТЕРНАТИВНАЯ
+#define USART_ENABLE 0	; 0 - OFF, 1 - ON
+                        ; 0 - выключено, 1 - включено
+#define INT_ENABLE 1	; 0 - OFF, 1 - ON
+                        ; 0 - выключено, 1 - включено
+#define Enable2MHz 0	; 0 - 1,75 MHz, 1 - 2MHz
+                        ; 0 - 1,75 МГц, 1 - 2МГц
+#define TS_Chip_0	1	; 0 - OFF, 1 - On   Если выключены оба TS_Chip, то будет работать как один стандартный AY
+                        ; 0 - выкл, 1 - вкл  Если оба TS_Chip выключены, работает как один стандартный AY
+#define TS_Chip_1	0	; 0 - OFF, 1 - On   Для TS версии нельзя выбирать сразу 2 чипа!!!!
+                        ; 0 - выкл, 1 - вкл  Для TS версии нельзя выбирать сразу 2 чипа!!!!
+; ========================================================================
+; bit numbers:
+; определения битов:
+.equ	b0	= 0x00
+.equ	b1	= 0x01
+.equ	b2	= 0x02
+.equ	b3	= 0x03
+.equ	b4	= 0x04
+.equ	b5	= 0x05
+.equ	b6	= 0x06
+.equ	b7	= 0x07
+.equ	CHIP_SELECTED = GPIOR0 ; регистр выбора чипа
+
+; ===== РАСПРЕДЕЛЕНИЕ РЕГИСТРОВ =====
+; r0  - OutA (выход канала A)
+; r1  - OutC (выход канала C)
+; r2  - C1F (константа 0x1F для инверсии конверта)
+; r3  - CntN (счетчик шума)
+; r4  - OutB (выход канала B)
+; r5  - BusOut1 (маска портов C/D для записи)
+; r6  - NoiseAddon (LFSR шума)
+; r7  - C00 (константа 0x00)
+; r8  - CC0 (константа 0xC0)
+; r9  - TabE (код конверта)
+; r10 - C04 (константа 0x04)
+; r11 - TMP (временный регистр)
+; r12 - EVal (значение конверта)
+; r13 - SREGSave (сохраненный SREG)
+; r14 - RNGL (LFSR шума LOW)
+; r15 - RNGH (LFSR шума HIGH)
+; r16 - BusData (данные шины)
+; r17 - BusOut2 (маска портов для чтения)
+; r18 - TabP (счетчик периода конверта)
+; r19 - TNLevel (уровни тонов и шума)
+; r20 - CntAL (счетчик канала A LOW)
+; r21 - CntAH (счетчик канала A HIGH)
+; r22 - CntBL (счетчик канала B LOW)
+; r23 - CntBH (счетчик канала B HIGH)
+; r24 - CntCL (счетчик канала C LOW)
+; r25 - CntCH (счетчик канала C HIGH)
+; r26 - CntEL (счетчик конверта LOW)
+; r27 - CntEH (счетчик конверта HIGH)
+; r30 - ADDR (адрес регистра, используется как Z)
+
+.def OutA  = r0      ; определение псевдонимов для регистров
+.def OutC  = r1
+.def C1F   = r2
+.def CntN  = r3
+.def OutB  = r4
+.def BusOut1  = r5
+.def NoiseAddon = r6
+.def C00   = r7
+.def CC0   = r8
+.def TabE  = r9
+.def C04   = r10
+.def TMP   = r11
+.def EVal  = r12
+.def SREGSave = r13
+.def RNGL  = r14
+.def RNGH  = r15
+.def BusData  = r16
+.def BusOut2  = r17
+.def TabP  = r18
+.def TNLevel  = r19
+.def CntAL  = r20
+.def CntAH  = r21
+.def CntBL  = r22
+.def CntBH  = r23
+.def CntCL  = r24
+.def CntCH  = r25
+.def CntEL  = r26
+.def CntEH  = r27
+.def ADDR  = r30
+
+; ==============================================
+; LGT8F328P REGISTER DEFINITIONS
+; ОПРЕДЕЛЕНИЯ РЕГИСТРОВ LGT8F328P
+; ==============================================
+; Memory-mapped I/O addresses for LGT8F328P
+; Адреса ввода/вывода для LGT8F328P
+.equ CCP     = 0x34      ; Configuration Change Protection
+                        ; Защита изменения конфигурации
+.equ CLKMSR  = 0x105     ; Clock Main Settings Register
+                        ; Регистр основных настроек тактирования
+.equ BCR     = 0x107     ; Boot Control Register
+                        ; Регистр управления загрузчиком
+.equ BOOTEND = 0x108     ; Boot End Address
+                        ; Конечный адрес загрузчика
+.equ BODCR   = 0x104     ; BOD Control Register
+                        ; Регистр управления BOD
+
+; AC0 (Analog Comparator 0) Register Definition
+; Определение регистров AC0 (аналоговый компаратор 0)
+.equ C0SR   = 0x50      ; статусный регистр компаратора 0
+.equ C0D    = 7         ; бит отключения компаратора
+.equ C0BG   = 6         ; бит выбора опорного напряжения
+.equ C0O    = 5         ; выход компаратора
+.equ C0I    = 4         ; инвертирование выхода
+.equ C0IE   = 3         ; разрешение прерывания
+.equ C0IC   = 2         ; флаг прерывания
+.equ C0IS1  = 1         ; выбор источника прерывания
+.equ C0IS0  = 0         ; выбор источника прерывания
+
+.equ C0XR   = 0x51      ; регистр управления компаратором 0
+.equ C0OE   = 6         ; выходной драйвер
+.equ C0HSYE = 5         ; высокоскоростной режим
+.equ C0PS0  = 4         ; положительный вход
+.equ C0WKE  = 3         ; пробуждение
+.equ C0FEN  = 2         ; фильтр
+.equ C0FS1  = 1         ; выбор фильтра
+.equ C0FS0  = 0         ; выбор фильтра
+
+.equ C0TR   = 0x52      ; регистр триггера компаратора 0
+
+; AC1 (Analog Comparator 1) Register Definition
+; Определение регистров AC1 (аналоговый компаратор 1)
+.equ C1SR   = 0x2F      ; статусный регистр компаратора 1
+.equ C1D    = 7         ; бит отключения компаратора
+.equ C1BG   = 6         ; бит выбора опорного напряжения
+.equ C1O    = 5         ; выход компаратора
+.equ C1I    = 4         ; инвертирование выхода
+.equ C1IE   = 3         ; разрешение прерывания
+.equ C1IC   = 2         ; флаг прерывания
+.equ C1IS1  = 1         ; выбор источника прерывания
+.equ C1IS0  = 0         ; выбор источника прерывания
+
+.equ C1XR   = 0x3A      ; регистр управления компаратором 1
+.equ C1OE   = 6         ; выходной драйвер
+.equ C1HSYE = 5         ; высокоскоростной режим
+.equ C1PS0  = 4         ; положительный вход
+.equ C1WKE  = 3         ; пробуждение
+.equ C1FEN  = 2         ; фильтр
+.equ C1FS1  = 1         ; выбор фильтра
+.equ C1FS0  = 0         ; выбор фильтра
+
+.equ C1TR   = 0x5B      ; регистр триггера компаратора 1
+
+; LGT8F328P FAST GPIO REGISTERS
+; РЕГИСТРЫ БЫСТРОГО GPIO LGT8F328P
+.equ FGPIOE  = 0x10A       ; Fast GPIO Enable Register
+                            ; Регистр разрешения быстрого GPIO
+.equ FGPIO   = 0x10B       ; Fast GPIO Control Register
+                            ; Регистр управления быстрым GPIO
+
+	.cseg                   ; начало сегмента кода
+;------------------------------------------------------
+; INTERRUPT VECTORS TABLE
+; ТАБЛИЦА ВЕКТОРОВ ПРЕРЫВАНИЙ
+;------------------------------------------------------
+	.org	0x0000          ; адрес вектора сброса
+	rjmp	_LGT_INIT       ; переход к инициализации LGT
+
+	.org	INT0addr        ; адрес вектора прерывания INT0
+	rjmp	_INT0_Handler   ; обработчик прерывания INT0
+
+	.org	INT1addr        ; адрес вектора прерывания INT1
+ 	rjmp	_INT1_Handler   ; обработчик прерывания INT1
+
+	.org	URXCaddr        ; адрес вектора прерывания USART RX
+	rjmp	_USART_RX_COMPLETE ; обработчик завершения приема USART
+
+;------------------------------------------------------
+
+#if VOLUME_TABLE == 0        ; если выбрана таблица AY
+	Volumes: ; volume table for amplitude
+            ; таблица громкости для амплитуды
+		.db 0,1,1,1,2,2,3,5,6,9,13,17,22,29,36,45 // AY_TABLE
+	EVolumes: ; volume table for envelopes
+            ; таблица громкости для огибающих
+		.db 0,0,1,1,1,1,1,1,2,2,2,2,3,3,5,5,6,6,7,9,11,13,15,17,19,22,25,29,32,36,40,45 // AY_TABLE
+#elif VOLUME_TABLE == 1      ; если выбрана таблица YM
+	Volumes: ; volume table for amplitude
+            ; таблица громкости для амплитуды
+		.db 0,1,1,1,2,2,3,4,5,7,10,13,18,24,34,45 // YM_TABLE
+	EVolumes: ; volume table for envelopes
+            ; таблица громкости для огибающих
+		.db 0,0,1,1,1,1,1,1,2,2,2,2,2,3,3,4,4,5,6,7,8,10,11,13,15,18,21,24,29,34,40,45 // YM_TABLE
+#elif VOLUME_TABLE == 2      ; если выбрана альтернативная таблица
+	Volumes: ; volume table for amplitude
+            ; таблица громкости для амплитуды
+		.db 0,1,2,3,4,5,6,7,9,11,13,16,22,31,42,58 // ALT_TABLE
+	EVolumes: ; volume table for envelopes
+            ; таблица громкости для огибающих
+		.db 0,1,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,20,22,24,26,28,30,33,36,40,45,51,58 // ALT_TABLE
+#endif
+
+; envelope codes, bit0 - attack, bit1 - invert on next cycle, bit2 - stop generator on next cycle
+; коды огибающей, бит0 - атака, бит1 - инвертировать в следующем цикле, бит2 - остановить генератор в следующем цикле
+Envelopes:                  ; таблица кодов огибающей
+	.db 7,7,7,7,4,4,4,4,1,7,3,5,0,6,2,4
+
+; mask applied to registers values after receiving
+; маска, применяемая к значениям регистров после получения
+RegsMask:                   ; таблица масок регистров
+	.db 0xFF,0x0F,0xFF,0x0F,0xFF,0x0F,0x1F,0xFF,0x1F,0x1F,0x1F,0xFF,0xFF,0x0F,0xFF,0xFF
+
+;==========================================================
+_INT0_Handler:					; 4 cycles to enter
+                                ; обработчик INT0, 4 цикла на вход
+	sbic	PinD,b3				; check BDIR (1)
+                                ; проверить BDIR (1)
+	rjmp	LATCH_REG_ADDR0		; (2) if BDIR=1
+                                ; (2) если BDIR=1
+
+#if TS_Chip_0 > 0 || TS_Chip_1 > 0 
+                                ; если активен хотя бы один TS-чип
+	sbic   CHIP_SELECTED,0      ; (1) check chip select
+                                ; (1) проверить выбор чипа
+    rjmp    exit_int0			; (2) skip if not selected
+                                ; (2) пропустить если не выбран
+#endif
+
+	; READ MODE - минимальное время
+	; РЕЖИМ ЧТЕНИЯ - минимальное время
+	out		DDRD,BusOut2		; 1 - set data bus
+                                ; 1 - установить шину данных
+	out		DDRC,BusOut1		; 1
+                                ; 1
+	
+LOOP_NOT_INACTIVE:              ; цикл ожидания неактивного состояния
+	sbic	PinD,b2				; 1 - wait for BC1=0
+                                ; 1 - ждать BC1=0
+	rjmp	LOOP_NOT_INACTIVE	; 2
+                                ; 2
+	
+	; Быстрый сброс портов (4 цикла вместо 6)
+	out		DDRC, C00			; 1
+                                ; 1
+	out		DDRD, C00			; 1
+                                ; 1
+	; Убрал выключение подтяжек - они не критичны для работы
+exit_int0:                      ; выход из обработчика
+	out		EIFR, YH			; 1 - clear flags
+                                ; 1 - очистить флаги
+	reti						; 4
+                                ; 4
+
+LATCH_REG_ADDR0:                ; защелкнуть адрес регистра
+	in		ADDR, PinC			; 1
+                                ; 1
+	andi	ADDR, 0x3F			; 1
+                                ; 1
+
+#if TS_Chip_0 > 0 || TS_Chip_1 > 0
+                                ; если активен TS-чип
+	sbic	PinD,b7		        ; проверить CS
+	rjmp    SELECT_CHIP_ADDR0   ; перейти к выбору чипа
+#endif
+	ldd		BusOut1, Z+0x20		; 2
+                                ; 2
+	ldd		BusOut2, Z+0x30		; 2
+                                ; 2
+	rjmp	exit_int0			; 2
+                                ; 2
+
+
+SELECT_CHIP_ADDR0:              ; выбор чипа по адресу
+#if TS_Chip_0 > 0               ; если активен TS_Chip_0
+	cpi		ADDR, 0x3F			; 1
+                                ; 1
+	breq	LATCH_SELECT_CHIP0	; 1/2
+                                ; 1/2
+	cpi		ADDR, 0x3E          ; сравнить с 0x3E
+	breq	RESET_LATCH0	    ; 2
+                                ; 2
+#elif TS_Chip_1 > 0             ; если активен TS_Chip_1
+	cpi		ADDR, 0x3E			; 1
+                                ; 1
+	breq	LATCH_SELECT_CHIP0	; 1/2
+                                ; 1/2
+	cpi		ADDR, 0x3F          ; сравнить с 0x3F
+	breq	RESET_LATCH0	    ; 2
+                                ; 2
+#endif
+
+LATCH_SELECT_CHIP0:             ; защелкнуть выбор чипа
+	sbi		CHIP_SELECTED, b0	; 2
+                                ; 2
+	rjmp	exit_int0			; 2
+                                ; 2
+
+RESET_LATCH0:                   ; сбросить выбор чипа
+	cbi		CHIP_SELECTED, b0	; 2
+                                ; 2
+	rjmp	exit_int0			; 2
+                                ; 2
+
+;==========================================================
+_INT1_Handler:					; 4 cycles to enter
+                                ; обработчик INT1, 4 цикла на вход
+	in		BusData, PinC		; 1
+                                ; 1
+	andi	BusData, 0x3F		; 1
+                                ; 1
+
+	sbic	PinD, b2			; 1
+                                ; 1
+	rjmp	LATCH_REG_ADDR1		; 2
+                                ; 2
+
+#if TS_Chip_0 > 0 || TS_Chip_1 > 0 
+                                ; если активен TS-чип
+	sbic   CHIP_SELECTED, 0		; 1
+                                ; 1
+    rjmp    exit_int1			; 2
+                                ; 2
+#endif
+
+	; WRITE MODE - оптимизированная версия
+	; РЕЖИМ ЗАПИСИ - оптимизированная версия
+	in		BusOut1, PinD		; 1
+                                ; 1
+	in		SREGSave, SREG		; 1
+                                ; 1
+	and		BusOut1, CC0		; AND с константой 0xC0
+	or		BusData, BusOut1	; 1
+                                ; 1
+	mov		BusOut1, BusData	; 1
+                                ; 1
+	com		BusOut1				; 1
+                                ; 1
+	
+	; Загружаем маску одновременно с другими операциями
+	ld		BusOut2, Z			; 2 - load mask
+                                ; 2 - загрузить маску
+	std		Z+0x20, BusOut1		; 2 - save inverted
+                                ; 2 - сохранить инвертированное значение
+	
+	and		BusData, BusOut2	; 1 - apply mask
+                                ; 1 - применить маску
+	mov		BusOut2, BusOut1	; 1
+                                ; 1
+	andi	BusOut2, 0xC0		; 1 - extract bits 6-7
+                                ; 1 - извлечь биты 6-7
+	
+	std		Z+0x30, BusOut2		; 2 - save high bits
+                                ; 2 - сохранить старшие биты
+	std		Z+0x10, BusData		; 2 - save value
+                                ; 2 - сохранить значение
+	
+	; Проверка регистра 13 через прямое сравнение
+	cpi		ADDR, 0x0D			; 1
+                                ; 1
+	brne	NO_ENVELOPE_CHANGED_P; 1/2
+                                ; 1/2
+	ori		TNLevel, 0x80		; 1
+                                ; 1
+NO_ENVELOPE_CHANGED_P:          ; огибающая не изменилась
+	out		SREG, SREGSave		; 1
+                                ; 1
+	rjmp	exit_int1			; 2
+                                ; 2
+
+LATCH_REG_ADDR1:                ; защелкнуть адрес регистра
+	mov		ADDR, BusData		; 1
+                                ; 1
+
+#if TS_Chip_0 > 0 || TS_Chip_1 > 0
+                                ; если активен TS-чип
+	sbic	PinD,b6		        ; проверить CS
+	rjmp    SELECT_CHIP_ADDR1   ; перейти к выбору чипа
+#endif
+
+	ldd		BusOut1, Z+0x20		; 2
+                                ; 2
+	ldd		BusOut2, Z+0x30		; 2
+                                ; 2
+	rjmp	exit_int1			; 2
+                                ; 2
+
+SELECT_CHIP_ADDR1:              ; выбор чипа по адресу
+#if TS_Chip_0 > 0               ; если активен TS_Chip_0
+	cpi		ADDR, 0x3F			; 1
+                                ; 1
+	breq	LATCH_SELECT_CHIP1	; 1/2
+                                ; 1/2
+	cpi		ADDR, 0x3E          ; сравнить с 0x3E
+	breq	RESET_LATCH1	    ; 2
+                                ; 2
+#elif TS_Chip_1 > 0             ; если активен TS_Chip_1
+	cpi		ADDR, 0x3E			; 1
+                                ; 1
+	breq	LATCH_SELECT_CHIP1	; 1/2
+                                ; 1/2
+	cpi		ADDR, 0x3F          ; сравнить с 0x3F
+	breq	RESET_LATCH1	    ; 2
+                                ; 2
+#endif
+
+
+LATCH_SELECT_CHIP1:             ; защелкнуть выбор чипа
+	sbi		CHIP_SELECTED, b0	; 2
+                                ; 2
+exit_int1:                      ; выход из обработчика
+	out		EIFR, ZH			; 1
+                                ; 1
+	reti						; завершить прерывание
+
+RESET_LATCH1:                   ; сбросить выбор чипа
+	cbi		CHIP_SELECTED, b0	; 2
+                                ; 2
+	rjmp	exit_int1			; 2
+                                ; 2
+
+;==========================================================
+_USART_RX_COMPLETE:             ; завершение приема USART
+	lds		BusData,UDR0		; get byte from USART
+                                ; получить байт из USART
+	sbrs	ADDR,b4				; check for address/data mode
+                                ; проверить режим адрес/данные
+	rjmp	RECV_REG_VALUE      ; перейти к приему значения регистра
+	sbrc	BusData,b7          ; проверить старший бит
+	rjmp	USART_SYNC          ; перейти к синхронизации
+	mov		ADDR,BusData        ; ------ receive register number ------------
+                                ; ------ принять номер регистра ------------
+	reti                        ; вернуться из прерывания
+USART_SYNC:						; ------ synchronization mode ---------------
+                                ; ------ режим синхронизации ---------------
+	ldi		ADDR,0x10           ; установить адрес 0x10
+	reti                        ; вернуться из прерывания
+
+RECV_REG_VALUE:					; ------ receive register value -------------
+                                ; ------ принять значение регистра ------------
+	in		SREGSave,SREG       ; сохранить SREG
+	ld		BusOut1,Z			; load register mask
+                                ; загрузить маску регистра
+	and		BusData,BusOut1		; apply register mask
+                                ; применить маску регистра
+	std		Z+0x10,BusData		; put register value to SRAM
+                                ; поместить значение регистра в SRAM
+	cpi		ADDR,0x0D			; check for envelope shape register
+                                ; проверить регистр формы огибающей
+	brne	NO_ENVELOPE_CHANGED_S ; если не регистр 13
+	ori		TNLevel,0x80		; set envelope change flag (bit 7)
+                                ; установить флаг изменения огибающей (бит 7)
+NO_ENVELOPE_CHANGED_S:          ; огибающая не изменилась
+	ldi		ADDR,0x10			; set bit 4 to jump to receive register number on next byte received
+                                ; установить бит 4 для перехода к приему номера регистра при следующем байте
+	out		SREG,SREGSave       ; восстановить SREG
+	reti                        ; вернуться из прерывания
+
+
+; ==============================================
+; LGT8F328P INITIALIZATION - NO BOOTLOADER
+; ИНИЦИАЛИЗАЦИЯ LGT8F328P - БЕЗ ЗАГРУЗЧИКА
+; ==============================================
+_LGT_INIT:                      ; инициализация LGT
+    ; 1. Disable watchdog immediately
+    ; 1. Немедленно отключить watchdog
+    ldi     r16, 0x00           ; загрузить 0x00
+    sts     WDTCSR, r16         ; записать в регистр WDTCSR
+    
+    ; 2. Unlock protected registers (LGT specific)
+    ; 2. Разблокировать защищенные регистры (специфично для LGT)
+    ldi     r16, 0xD8           ; загрузить магическое число
+    sts     CCP, r16          ; Enable configuration changes
+                                ; разрешить изменения конфигурации
+    
+    ; 3. Configure clock: 32MHz internal, divisor = 1
+    ; 3. Настроить тактирование: внутренний 32МГц, делитель = 1
+    ldi     r16, 0x80           ; загрузить значение для CLKPR
+    sts     CLKPR, r16        ; Enable CLKPR changes
+                                ; разрешить изменения CLKPR
+    
+    ldi     r16, 0xD8           ; загрузить магическое число
+    sts     CCP, r16            ; разрешить изменения
+    ldi     r16, 0x00           ; делитель = 1
+    sts     CLKPR, r16        ; Divisor = 1 (32MHz)
+                                ; делитель = 1 (32МГц)
+    
+    ; 4. Select internal 32MHz oscillator
+    ; 4. Выбрать внутренний 32МГц осциллятор
+    ldi     r16, 0xD8           ; загрузить магическое число
+    sts     CCP, r16            ; разрешить изменения
+    ldi     r16, 0x04           ; выбрать внутренний 32МГц
+    sts     CLKMSR, r16       ; Internal 32MHz oscillator
+                                ; внутренний 32МГц осциллятор
+  
+    ; 5. ENABLE FAST GPIO FOR PORTS B, C, D
+    ; 5. ВКЛЮЧИТЬ БЫСТРЫЙ GPIO ДЛЯ ПОРТОВ B, C, D
+    ldi     r16, 0xD8           ; загрузить магическое число
+    sts     CCP, r16            ; разрешить изменения
+    ldi     r16, (1<<2) | (1<<1) | (1<<0) ; включить для портов B, C, D
+    sts     FGPIOE, r16         ; записать в регистр FGPIOE
+    ldi     r16, 0xD8           ; загрузить магическое число
+    sts     CCP, r16            ; разрешить изменения
+    ldi     r16, (0<<4) | (0<<2) | (0<<0)  ; No delay for all ports
+                                            ; без задержки для всех портов
+    sts     FGPIO, r16          ; записать в регистр FGPIO
+    
+    ; 6. Configure Fast GPIO timing (optional, default is usually OK)
+    ; 6. Настроить тайминг быстрого GPIO (опционально, обычно подходит по умолчанию)
+    ldi     r16, 0xD8           ; загрузить магическое число
+    sts     CCP, r16            ; разрешить изменения
+    ldi     r16, 0x00           ; тайминг по умолчанию (без задержки)
+    sts     FGPIO, r16        ; Set Fast GPIO Control register
+                                ; установить регистр управления быстрым GPIO
+    
+    ; 7. DISABLE BOOTLOADER - BOOTRST=0, start from 0x0000
+    ; 7. ОТКЛЮЧИТЬ ЗАГРУЗЧИК - BOOTRST=0, старт с 0x0000
+    ldi     r16, 0x03         ; BOOTSZ=11, BOOTRST=0
+    sts     BCR, r16            ; записать в регистр BCR
+    
+    ; 8. Set BOOTEND (optional, defines flash boundary)
+    ; 8. Установить BOOTEND (опционально, определяет границу flash)
+    ldi     r16, 0x7F         ; 0x7F00 для 32КБ flash
+    sts     BOOTEND, r16       ; записать в регистр BOOTEND
+    
+    ; 9. Continue to original reset code
+    ; 9. Продолжить выполнение оригинального кода сброса
+    rjmp    _RESET             ; перейти к сбросу
+
+;==========================================================
+_RESET: // Emulator start
+        // Начало эмулятора
+	in		r16,MCUCR			; 1-> PUD for
+                                ; загрузить MCUCR
+	sbr		r16,PUD             ; установить бит PUD
+	out		MCUCR,r16           ; выключить подтяжки
+
+	// init stack pointer at end of RAM
+	// инициализировать указатель стека в конце RAM
+	ldi		r16,low(RAMEND)     ; загрузить младший байт конца RAM
+	out		SPL,r16             ; записать в SPL
+	ldi		r16,high(RAMEND)    ; загрузить старший байт конца RAM
+	out		SPH,r16             ; записать в SPH
+
+	; ИНИЦИАЛИЗАЦИЯ ПОРТОВ C и D В HI-Z ===================
+	; Порт C: PC0-PC5 - данные, должны быть в HI-Z
+	; Порт D: PD6,PD7 - данные, должны быть в HI-Z
+	ldi		r16,0x00            ; загрузить 0x00
+	out		DDRC,r16		; все пины порта C как входы
+                                ; установить все пины порта C как входы
+	out		PORTC,r16		; отключить подтяжки
+                                ; отключить подтяжки порта C
+	out		DDRD,r16		; все пины порта D как входы
+                                ; установить все пины порта D как входы
+	out		PORTD,r16		; отключить подтяжки
+                                ; отключить подтяжки порта D
+	; =====================================================
+
+	; disable Analog Comparator ==============================
+	; отключить аналоговый компаратор =========================
+	ldi		r16, (1<<C0D)       ; загрузить значение для отключения AC0
+	sts		C0SR, r16           ; отключить компаратор 0
+	ldi		r16, (1<<C1D)       ; загрузить значение для отключения AC1
+	out	    C1SR, r16           ; отключить компаратор 1
+	;=========================================================
+
+	// init constants
+	// инициализация констант
+#if TS_Chip_0 > 0               ; если активен TS_Chip_0
+	sbi  CHIP_SELECTED, b0      ; установить бит выбора чипа
+#elif TS_Chip_1 > 0             ; если активен TS_Chip_1
+	cbi  CHIP_SELECTED, b0      ; сбросить бит выбора чипа
+#endif
+
+	clr		C00                  ; очистить регистр C00 (0x00)
+	ldi		r16,0xC0             ; загрузить 0xC0
+	mov		CC0,r16              ; переместить в CC0
+	ldi		r16,0x04             ; загрузить 0x04
+	mov		C04,r16              ; переместить в C04
+	ldi		r16,0x1F             ; загрузить 0x1F
+	mov		C1F,r16              ; переместить в C1F
+	ldi		r16,0xFF             ; загрузить 0xFF
+	mov		BusOut1,r16          ; переместить в BusOut1
+	mov		BusOut2,CC0          ; переместить CC0 в BusOut2
+	clr		RNGH                 ; очистить RNGH
+	ldi		YH,0xFF              ; загрузить 0xFF в YH
+	// clear register values in SRAM 0x110-0x13F
+	// очистить значения регистров в SRAM 0x110-0x13F
+	ldi		r18,0x10             ; загрузить счетчик (16)
+	ldi		ZL,0x10              ; начальный адрес
+	ldi		ZH,0x01              ; старший байт адреса
+LOOP0:                          ; цикл очистки
+	std		Z+0x20,CC0           ; сохранить CC0 по смещению 0x20
+	std		Z+0x10,r16           ; сохранить 0xFF по смещению 0x10
+	st		Z+,C00               ; сохранить 0x00 и увеличить указатель
+	dec		r18                  ; уменьшить счетчик
+	brne	LOOP0                ; повторять пока не 0
+
+	; load envelope codes to SRAM 0x210, 16 bytes
+	; загрузить коды огибающей в SRAM 0x210, 16 байт
+	ldi		xh,0x02              ; старший байт адреса X
+	ldi		xl,0x10              ; младший байт адреса X
+	ldi 	zl, low(2*Envelopes) ; младший байт адреса таблицы
+	ldi 	zh, high(2*Envelopes); старший байт адреса таблицы
+	ldi		r18,0x10             ; счетчик (16 байт)
+	rcall	_COPY                ; вызвать подпрограмму копирования
+
+	; load volume table for amplitude to SRAM 0x220, 16 bytes
+	; загрузить таблицу громкости для амплитуды в SRAM 0x220, 16 байт
+	ldi		xl,0x20              ; младший байт адреса X
+	ldi 	zl, low(2*Volumes)   ; младший байт адреса таблицы
+	ldi 	zh, high(2*Volumes)  ; старший байт адреса таблицы
+	ldi		r18,0x10             ; счетчик (16 байт)
+	rcall	_COPY                ; вызвать подпрограмму копирования
+
+	; load volume table for envelopes to SRAM 0x230, 32 bytes
+	; загрузить таблицу громкости для огибающих в SRAM 0x230, 32 байта
+	ldi		xl,0x30              ; младший байт адреса X
+	ldi 	zl, low(2*EVolumes)  ; младший байт адреса таблицы
+	ldi 	zh, high(2*EVolumes) ; старший байт адреса таблицы
+	ldi		r18,0x20             ; счетчик (32 байта)
+	rcall	_COPY                ; вызвать подпрограмму копирования
+
+	; load register masks to SRAM 0x100, 16 bytes
+	; загрузить маски регистров в SRAM 0x100, 16 байт
+	clr		xl                   ; очистить XL
+	ldi		xh,0x01              ; старший байт адреса X
+	ldi 	zl, low(2*RegsMask)  ; младший байт адреса таблицы
+	ldi 	zh, high(2*RegsMask) ; старший байт адреса таблицы
+	ldi		r18,0x10             ; счетчик (16 байт)
+	rcall	_COPY                ; вызвать подпрограмму копирования
+
+	ldi		ZH,0x01		        ; set high byte of register Z for fast acces to register values
+                                ; установить старший байт регистра Z для быстрого доступа к значениям регистров
+	clr		ZL                   ; очистить младший байт Z
+	ldi		YH,0x02		        ; set high byte of register Y for fast acces to volume table
+                                ; установить старший байт регистра Y для быстрого доступа к таблице громкости
+	mov		NoiseAddon,ZH	    ; load default value = 1 to high bit of noise generator
+                                ; загрузить значение по умолчанию = 1 в старший бит генератора шума
+
+#if USART_ENABLE > 0            ; если USART включен
+	// init USART
+	// инициализация USART
+	clr		r16                  ; очистить r16
+	sts		UBRR0H,r16           ; установить старший байт скорости
+	ldi		r16,0x06             ; загрузить значение для UCSR0C
+	sts		UCSR0C,r16           ; установить формат 8N1
+	ldi		r16,0x02             ; загрузить значение для UCSR0A
+	sts		UCSR0A,r16           ; установить флаг
+	ldi		r16,0x90             ; загрузить значение для UCSR0B
+	sts		UCSR0B,r16           ; включить приемник и прерывание
+	ldi		r18,0x44             ; загрузить значение скорости
+	sts		UBRR0L,r18           ; установить младший байт скорости
+#endif
+
+	// init Timer1
+	// инициализация Timer1
+	sts		OCR1AH,C00           ; очистить старший байт OCR1A
+	sts		OCR1AL,C00           ; очистить младший байт OCR1A
+	sts		OCR1BH,C00           ; очистить старший байт OCR1B
+	sts		OCR1BL,C00           ; очистить младший байт OCR1B
+	sbi		DDRB,b1		        ; set port B pin 1 to output for PWM (AY channel A)
+                                ; установить вывод B1 как выход для ШИМ (канал A AY)
+	sbi		DDRB,b2		        ; set port B pin 2 to output for PWM (AY channel B)
+                                ; установить вывод B2 как выход для ШИМ (канал B AY)
+	ldi		r16,0xA2             ; загрузить значение для TCCR1A
+	sts		TCCR1A,r16           ; настроить режим ШИМ
+	ldi		r16,0x19             ; загрузить значение для TCCR1B
+	sts		TCCR1B,r16           ; настроить предделитель и режим
+	ldi		r16,0x19             ; загрузить значение для TCCR1B
+	sts		TCCR1B,r16           ; настроить предделитель и режим
+#if Enable2MHz == 0             ; если 1,75 МГц версия
+	ldi		r18, 0x91            ; загрузить значение для ICR1
+#else                           ; иначе 2 МГц версия
+	ldi		r18, 0x7F            ; загрузить значение для ICR1
+#endif		
+	sts		ICR1H,C00            ; очистить старший байт ICR1
+	sts		ICR1L,r18            ; set PWM speed 
+                                ; установить скорость ШИМ
+	; ICR1L value formula (32000000/109375/2 - 1) where 32000000 = 32MHz - AVR oscillator frequency
+	; формула для ICR1L (32000000/109375/2 - 1), где 32000000 = 32МГц - частота осциллятора AVR
+	; 109375 is for 1.75 MHz version, formula is (PSG frequency / 16) e.g. for 2MHz it is 2000000/16 = 125000
+	; 109375 для версии 1.75 МГц, формула (частота PSG / 16), например для 2МГц это 2000000/16 = 125000
+
+#if CHANNELS == 3               ; если 3-канальная версия
+	// init Timer2
+	// инициализация Timer2
+	sbi	DDRB,DDB3               ; set port B pin 3 to output for PWM (AY channel C)
+                                ; установить вывод B3 как выход для ШИМ (канал C AY)
+	ldi	r16,0x83                 ; загрузить значение для TCCR2A
+	sts	TCCR2A,r16               ; настроить режим ШИМ
+	ldi	r16,0x01                 ; загрузить значение для TCCR2B
+	sts	TCCR2B,r16               ; настроить предделитель
+#endif
+
+#if INT_ENABLE > 0              ; если прерывания включены
+	; set INT0,INT1 ============================================
+	; настройка INT0,INT1 ======================================
+	ldi		r16, (1<<ISC01)|(1<<ISC00)|(1<<ISC11)|(1<<ISC10)	; rising edge
+                                ; прерывание по фронту
+	sts		EICRA, r16           ; установить регистр EICRA
+	ldi		r16, (1<<INTF0)|(1<<INTF1) ; маска для очистки флагов
+	out		EIFR, r16            ; clear interrupt flags
+                                ; очистить флаги прерываний
+	ldi		r16, (1<<INT0)|(1<<INT1) ; маска разрешения прерываний
+	out		EIMSK, r16           ; enable interrupts
+                                ; разрешить прерывания
+	; ==========================================================
+#endif
+
+	// init constants and variables second part
+	// инициализация констант и переменных, вторая часть
+	ldi		ADDR,0x10            ; установить начальный адрес
+	clr		TNLevel              ; очистить уровни тонов и шума
+	clr		OutA                 ; очистить выход канала A
+	clr		OutB                 ; очистить выход канала B
+	clr		OutC                 ; очистить выход канала C
+	mov		TabP,CC0		        ; set envelope generator disablet by default
+                                ; отключить генератор огибающей по умолчанию
+	clr		TabE                 ; очистить код огибающей
+	clr		BusData              ; очистить данные шины
+	clr		CntN                 ; очистить счетчик шума
+	clr		CntAL                ; очистить младший байт счетчика канала A
+	clr		CntAH                ; очистить старший байт счетчика канала A
+	movw	CntBL,CntAL          ; скопировать в счетчик канала B
+	movw	CntCL,CntAL          ; скопировать в счетчик канала C
+	movw	CntEL,CntAL          ; скопировать в счетчик огибающей
+	clr		EVal                 ; очистить значение огибающей
+	sei						    ; enable global interrupts
+                                ; разрешить глобальные прерывания
+
+_MAIN_LOOP:                     ; главный цикл
+	// MAIN LOOP ========================================================================
+	in		YL,TIFR1		        ; check timer1 overflow flag TOV1
+                                ; проверить флаг переполнения таймера1 TOV1
+	sbrs	YL,TOV1              ; пропустить если флаг не установлен
+	rjmp	_MAIN_LOOP		    ; jump if not set
+                                ; перейти если не установлен
+	out		TIFR1,YL		        ; clear timer overflow flag
+                                ; очистить флаг переполнения таймера
+
+	// sound generation code start (using timer1 overflow flag)
+	// начало кода генерации звука (используя флаг переполнения таймера1)
+	// MIN cycles: 69
+	// МИН циклов: 69
+	// MAX cycles: 110
+	// МАКС циклов: 110
+
+	/////////////////////////////////////////////////////////////////////////////////////
+	/// ENVELOPE GENERATOR
+	/// ГЕНЕРАТОР ОГИБАЮЩЕЙ
+	/////////////////////////////////////////////////////////////////////////////////////
+	sbrs	TNLevel,b7           ; проверить флаг изменения огибающей
+	rjmp	NO_ENVELOPE_CHANGED  ; перейти если не установлен
+
+	// initialize envelope generator after change envelope shape register, only first 1/32 part of the first period!
+	// инициализировать генератор огибающей после изменения регистра формы, только первые 1/32 первого периода!
+	lds		YL,AY_REG13		    ; load envelope shape register value to TabE
+                                ; загрузить значение регистра формы огибающей в TabE
+	ldd		TabE,Y+0x10		    ; get envelope code from SRAM
+                                ; получить код огибающей из SRAM
+	ldi		TabP,0x1F		    ; set counter for envelope period
+                                ; установить счетчик периода огибающей
+	andi	TNLevel,0x7F	    ; clear envelope shape change flag
+                                ; очистить флаг изменения формы огибающей
+	rjmp	E_NEXT_STEP         ; перейти к следующему шагу
+
+NO_ENVELOPE_CHANGED:            ; огибающая не изменилась
+	sbrc	TabE,b7			    ; alternate: cpi	TabE,0x80	; check if envelope generator is disabled
+                                ; проверить отключен ли генератор огибающей
+	rjmp	ENVELOPE_GENERATOR_END	; alternate: brcc	ENVELOPE_GENERATOR_END
+                                ; перейти к концу если отключен
+	sbiw	CntEL,0x01          ; уменьшить счетчик огибающей
+	brcs	E_NEXT_PERIOD	    ; jump to init next envelope value if counter overflow (if initial value was 0)
+                                ; перейти к инициализации следующего значения если счетчик переполнился
+	brne	ENVELOPE_GENERATOR_END	; go to the next step if zero value is not reached
+                                ; перейти к следующему шагу если не достигнут 0
+E_NEXT_PERIOD:                  ; следующий период
+	dec		TabP                 ; уменьшить счетчик периода
+	brpl	E_NEXT_STEP		    ; jump to next step if envelope period >= 0
+                                ; перейти к следующему шагу если период >= 0
+	;init new envelope period
+	;инициализировать новый период огибающей
+	ldi		TabP,0x1F            ; установить счетчик периода
+	sbrc	TabE,b1              ; если бит инверсии установлен
+	eor		TabE,ZH			    ; invert envelope ATTACK bit
+                                ; инвертировать бит атаки огибающей
+	sbrc	TabE,b2              ; если бит остановки установлен
+	or		TabE,CC0		    ; disable envelope generator until new envelope shape register recived
+                                ; отключить генератор огибающей до получения нового регистра формы
+E_NEXT_STEP:                    ; следующий шаг
+	lds		CntEL,AY_REG11       ; загрузить младший байт периода огибающей
+	lds		CntEH,AY_REG12       ; загрузить старший байт периода огибающей
+	mov		YL,TabP              ; скопировать счетчик периода
+	sbrs	TabE,b0              ; если бит атаки не установлен
+	eor		YL,C1F			    ; invert envelope value if ATTACK bit is not set
+                                ; инвертировать значение огибающей
+	ldd		EVal,Y+0x30		    ; translate envelope value to volume, read volume value from SRAM 0x230+YL
+                                ; преобразовать значение огибающей в громкость, прочитать из SRAM
+ENVELOPE_GENERATOR_END:         ; конец генератора огибающей
+	/////////////////////////////////////////////////////////////////////////////////////
+
+
+	/////////////////////////////////////////////////////////////////////////////////////
+	/// NOISE GENERATOR
+	/// ГЕНЕРАТОР ШУМА
+	/////////////////////////////////////////////////////////////////////////////////////
+	dec		CntN			    ; decrease noise period counter
+                                ; уменьшить счетчик периода шума
+	brpl	NOISE_GENERATOR_END ; skip if noise period is not finished (CntN>=0)
+                                ; пропустить если период шума не закончился
+	//init new cycle
+	//инициализировать новый цикл
+	lds		CntN,AY_REG06	    ; init noise period counter with value in AY register 6
+                                ; инициализировать счетчик периода шума значением из регистра 6 AY
+	dec		CntN                 ; уменьшить счетчик
+
+	lsr		NoiseAddon           ; сдвинуть NoiseAddon вправо
+	mov		NoiseAddon,RNGL      ; скопировать RNGL в NoiseAddon
+	ror		RNGH                 ; циклический сдвиг вправо RNGH
+	ror		RNGL                 ; циклический сдвиг вправо RNGL
+
+	ori		TNLevel,0x38	    ; set noise bits
+                                ; установить биты шума
+	sbrs	RNGL,b0              ; если младший бит RNGL не установлен
+	andi	TNLevel,0xC7	    ; reset noise bits
+                                ; сбросить биты шума
+	// make input bit
+	// сформировать входной бит
+	lsl		NoiseAddon           ; сдвинуть NoiseAddon влево
+	eor		NoiseAddon,RNGL      ; XOR с RNGL
+	lsr		NoiseAddon           ; сдвинуть NoiseAddon вправо
+NOISE_GENERATOR_END:            ; конец генератора шума
+	/////////////////////////////////////////////////////////////////////////////////////
+
+
+	/////////////////////////////////////////////////////////////////////////////////////
+	/// TONE GENERATOR
+	/// ГЕНЕРАТОР ТОНА
+	/////////////////////////////////////////////////////////////////////////////////////
+	; all counters are Int16 values (signed)
+	; все счетчики 16-битные (знаковые)
+	// Channel A -------------
+	// Канал A -------------
+	subi	CntAL,0x01		    ; CntA - 1
+                                ; CntA - 1
+	sbci	CntAH,0x00           ; вычесть с переносом
+	brpl	CH_A_NO_CHANGE	    ; CntA >= 0
+                                ; CntA >= 0
+	lds		CntAL,AY_REG00	    ; update channel A tone period counter
+                                ; обновить счетчик периода тона канала A
+	lds		CntAH,AY_REG01      ; загрузить старший байт
+	subi	CntAL,0x01		    ; CntA - 1
+                                ; CntA - 1
+	sbci	CntAH,0x00           ; вычесть с переносом
+	eor		TNLevel,ZH		    ; TNLevel xor 1 (change logical level of channel A)
+                                ; TNLevel XOR 1 (изменить логический уровень канала A)
+CH_A_NO_CHANGE:                 ; канал A не изменился
+
+	// Channel B -------------
+	// Канал B -------------
+	subi	CntBL,0x01		    ; CntB - 1
+                                ; CntB - 1
+	sbci	CntBH,0x00           ; вычесть с переносом
+	brpl	CH_B_NO_CHANGE	    ; CntB >= 0
+                                ; CntB >= 0
+	lds		CntBL,AY_REG02	    ; update channel B tone period counter
+                                ; обновить счетчик периода тона канала B
+	lds		CntBH,AY_REG03      ; загрузить старший байт
+	subi	CntBL,0x01		    ; CntB - 1
+                                ; CntB - 1
+	sbci	CntBH,0x00           ; вычесть с переносом
+	eor		TNLevel,YH		    ; TNLevel xor 2 (change logical level of channel B)
+                                ; TNLevel XOR 2 (изменить логический уровень канала B)
+CH_B_NO_CHANGE:                 ; канал B не изменился
+
+	// Channel C -------------
+	// Канал C -------------
+	sbiw	CntCL,0x01		    ; CntC - 1
+                                ; CntC - 1
+	brpl	CH_C_NO_CHANGE	    ; CntC >= 0
+                                ; CntC >= 0
+	lds		CntCL,AY_REG04	    ; update channel C tone period counter
+                                ; обновить счетчик периода тона канала C
+	lds		CntCH,AY_REG05      ; загрузить старший байт
+	sbiw	CntCL,0x01		    ; CntC - 1
+                                ; CntC - 1
+	eor		TNLevel,C04		    ; TNLevel xor 4 (change logical level of channel C)
+                                ; TNLevel XOR 4 (изменить логический уровень канала C)
+CH_C_NO_CHANGE:                 ; канал C не изменился
+	/////////////////////////////////////////////////////////////////////////////////////
+
+
+	/////////////////////////////////////////////////////////////////////////////////////
+	/// MIXER
+	/// МИКШЕР
+	/////////////////////////////////////////////////////////////////////////////////////
+	lds		TMP,AY_REG07	    ; Load Mixer AY Register from SRAM
+                                ; Загрузить регистр микшера AY из SRAM
+	or		TMP,TNLevel		    ; Mixer formula = (Mixer Register Tone | TNLevel Tone) & (Mixer Register Noise | TNLevel Noise)
+                                ; Формула микшера = (Тон регистра микшера | Тон TNLevel) & (Шум регистра микшера | Шум TNLevel)
+	mov		YL,TMP               ; скопировать TMP в YL
+	lsl		YL                   ; сдвинуть YL влево
+	swap	YL                   ; поменять местами тетрады
+	and		TMP,YL               ; логическое И с YL
+	/////////////////////////////////////////////////////////////////////////////////////
+
+
+	/////////////////////////////////////////////////////////////////////////////////////
+	/// AMPLITUDE CONTROL
+	/// УПРАВЛЕНИЕ АМПЛИТУДОЙ
+	/////////////////////////////////////////////////////////////////////////////////////
+
+	// Channel A
+	// Канал A
+	lds		YL,AY_REG08		    ; Load Channel A Amplitude register
+                                ; Загрузить регистр амплитуды канала A
+	mov		OutA,EVal		    ; set envelope volume as default value
+                                ; установить громкость огибающей как значение по умолчанию
+	sbrs	YL,b4			    ; if bit 4 is not set in amplitude register then translate it to volume
+                                ; если бит 4 не установлен, преобразовать в громкость
+	ldd		OutA,Y+0x20		    ; load volume value from SRAM 0x220 + YL
+                                ; загрузить значение громкости из SRAM 0x220 + YL
+	sbrs	TMP,b0			    ; if channel is disabled in mixer - set volume to zero
+                                ; если канал отключен в микшере - установить громкость в 0
+	clr		OutA                 ; очистить OutA
+	
+	// Channel B
+	// Канал B
+	lds		YL,AY_REG09		    ; Load Channel B Amplitude register
+                                ; Загрузить регистр амплитуды канала B
+	mov		OutB,EVal		    ; set envelope volume as default value
+                                ; установить громкость огибающей как значение по умолчанию
+	sbrs	YL,b4			    ; if bit 4 is not set in amplitude register then translate it to volume
+                                ; если бит 4 не установлен, преобразовать в громкость
+	ldd		OutB,Y+0x20		    ; load volume value from SRAM 0x220 + YL
+                                ; загрузить значение громкости из SRAM 0x220 + YL
+	sbrs	TMP,b1			    ; if channel is disabled in mixer - set volume to zero
+                                ; если канал отключен в микшере - установить громкость в 0
+	clr		OutB                 ; очистить OutB
+
+	// Channel C
+	// Канал C
+	lds		YL,AY_REG10		    ; Load Channel C Amplitude register
+                                ; Загрузить регистр амплитуды канала C
+	mov		OutC,EVal		    ; set envelope volume as default value
+                                ; установить громкость огибающей как значение по умолчанию
+	sbrs	YL,b4			    ; if bit 4 is not set in amplitude register then translate it to volume
+                                ; если бит 4 не установлен, преобразовать в громкость
+	ldd		OutC,Y+0x20		    ; load volume value from SRAM 0x220 + YL
+                                ; загрузить значение громкости из SRAM 0x220 + YL
+	sbrs	TMP,b2			    ; if channel is disabled in mixer - set volume to zero
+                                ; если канал отключен в микшере - установить громкость в 0
+	clr		OutC                 ; очистить OutC
+
+	// Channel B
+	// Канал B
+#if CHANNELS == 2               ; если 2-канальная версия
+// two channel version ----------------------------------------
+// двухканальная версия ----------------------------------------
+	mov		YL,OutB              ; скопировать OutB в YL
+	lsr		OutB			    ; TMP = TMP - (TMP/4 + TMP/8);
+                                ; сдвиг вправо OutB
+	lsr		OutB                 ; сдвиг вправо OutB
+	sub		YL,OutB              ; вычесть OutB из YL
+	lsr		OutB                 ; сдвиг вправо OutB
+	sub		YL,OutB              ; вычесть OutB из YL
+	add		OutA,YL			    ; add channel B volume to channels A and C
+                                ; добавить громкость канала B к каналам A и C
+	add		OutC,YL              ; добавить к OutC
+// --------------------------------------------------------------
+#elif CHANNELS == 3             ; если 3-канальная версия
+// three channel version ----------------------------------------
+// трехканальная версия ----------------------------------------
+	sts	OCR2A,OutB              ; установить значение ШИМ для канала C
+// --------------------------------------------------------------
+#endif
+
+// --------------------------------------------------------------
+#if SPEAKER == 1                ; если включен вход динамика
+// speaker port enabled -----------------------------------------
+// вход динамика включен ----------------------------------------
+	sbic	PinD,b1			    ; check PD1 (SPEAKER PORT INPUT) skip if bit is not set
+                                ; проверить PD1 (вход динамика), пропустить если бит не установлен
+	add		OutA,C1F		    ; add some volume to channel A
+                                ; добавить громкость к каналу A
+	sbic	PinD,b1			    ; check PD1 (SPEAKER PORT INPUT) skip if bit is not set
+                                ; проверить PD1 (вход динамика), пропустить если бит не установлен
+	add		OutC,C1F		    ; add some volume to channel A
+                                ; добавить громкость к каналу A
+// --------------------------------------------------------------
+#endif
+
+	sts		OCR1AL,OutA		    ; update PWM counters
+                                ; обновить счетчики ШИМ
+	sts		OCR1BL,OutC          ; обновить OCR1B
+	rjmp	_MAIN_LOOP           ; вернуться в главный цикл
+// MAIN LOOP END ====================================================================
+// КОНЕЦ ГЛАВНОГО ЦИКЛА =============================================================
+
+
+// copy routine from flash to SRAM
+// подпрограмма копирования из flash в SRAM
+_COPY:                          ; подпрограмма копирования
+	lpm		r16,Z+               ; загрузить из flash с пост-инкрементом
+	st		X+,r16               ; сохранить в SRAM с пост-инкрементом
+	dec		r18                  ; уменьшить счетчик
+	brne	_COPY                ; повторять пока не 0
+	ret                          ; вернуться из подпрограммы
+
+/////////////////////////////////////////////////////////////////
+/// AY REGISTERS IN SRAM
+/// РЕГИСТРЫ AY В SRAM
+/////////////////////////////////////////////////////////////////
+	.dseg                       ; начало сегмента данных
+	.org	0x0110              ; адрес в SRAM
+AY_REG00:                       ; регистр 0 AY (тон канала A, младший байт)
+	.byte	1
+AY_REG01:                       ; регистр 1 AY (тон канала A, старший байт)
+	.byte	1
+AY_REG02:                       ; регистр 2 AY (тон канала B, младший байт)
+	.byte	1
+AY_REG03:                       ; регистр 3 AY (тон канала B, старший байт)
+	.byte	1
+AY_REG04:                       ; регистр 4 AY (тон канала C, младший байт)
+	.byte	1
+AY_REG05:                       ; регистр 5 AY (тон канала C, старший байт)
+	.byte	1
+AY_REG06:                       ; регистр 6 AY (период шума)
+	.byte	1
+AY_REG07:                       ; регистр 7 AY (управление микшером)
+	.byte	1
+AY_REG08:                       ; регистр 8 AY (амплитуда канала A)
+	.byte	1
+AY_REG09:                       ; регистр 9 AY (амплитуда канала B)
+	.byte	1
+AY_REG10:                       ; регистр 10 AY (амплитуда канала C)
+	.byte	1
+AY_REG11:                       ; регистр 11 AY (период огибающей, младший байт)
+	.byte	1
+AY_REG12:                       ; регистр 12 AY (период огибающей, старший байт)
+	.byte	1
+AY_REG13:                       ; регистр 13 AY (форма огибающей)
+	.byte	1
+AY_REG14:                       ; регистр 14 AY (порт A ввода/вывода)
+	.byte	1
+AY_REG15:                       ; регистр 15 AY (порт B ввода/вывода)
+	.byte	1
